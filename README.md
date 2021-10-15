@@ -46,6 +46,10 @@ python scripts/convert_reddit.py --input_path [Input file path which has the dow
 .\scripts\run.cmd
 ```
 
+## References
+[1] Kunho Kim, Sivakanth Gopi, Janardhan Kulkarni, Sergey Yekhanin. Differentially Private n-gram Extraction. In Proceedings of the Thirty-fifth Conference on Neural Information Processing Systems (NeurIPS), 2021.
+
+
 ## Contributing
 
 This project welcomes contributions and suggestions.  Most contributions require you to agree to a
