@@ -13,7 +13,8 @@ The code repository structure is as follows:
   - tokenize_text.py: tokenizs text with nltk tokenizer
 - scripts: has scripts to run the code
   - convert_msnbc.py: converts MSNBC data
-  - convert_reddit.py: converts Reddit data 
+  - convert_reddit.py: converts Reddit data
+- DPNE Experiments.ipynb: Jupyter notebook to run on pyspark container for experimentation, which also runs the scripts in `run.cmd` (see below for instructions on how to run this)
 
 ## Prerequisites
 
@@ -24,7 +25,7 @@ The code requires following libraries installed:
 - PySpark == 2.3
 - shrike
 
-## How to run
+## How to replicate results from the paper
 
 ### Prepare data
 First, download the data from below:
@@ -49,6 +50,16 @@ python scripts/convert_reddit.py --input_path [Input file path which has the dow
 ## References
 [1] Kunho Kim, Sivakanth Gopi, Janardhan Kulkarni, Sergey Yekhanin. Differentially Private n-gram Extraction. In Proceedings of the Thirty-fifth Conference on Neural Information Processing Systems (NeurIPS), 2021.
 
+## How to run experiments on a container
+This could also be used to replicate the results above. Follow these steps to get this running on a local container:
+- Make sure you have [docker installed](https://docs.docker.com/engine/install/) and running
+- Run `docker pull jupyter/pyspark-notebook` to install the pyspark-jupyter container
+- Run the container mapping port 8888 locally so you can run the notebook on your machine, using `docker run -p 8888:8888 --name jupyter-pyspark jupyter/pyspark-notebook` - from the logs that open up, paste the command into your browser to run the notebook - something like `http://127.0.0.1:8888/lab?token=<TOKEN>`
+- Bash into the container by running `docker exec -it jupyter-pyspark bash`
+- Run `git clone https://github.com/microsoft/differentially-private-ngram-extraction.git` to pull this repo into the container
+- Install the required libraries as mentioned above (`pip install nltk numpy pyspark shrike`)
+- Copy over into the differentially-private-ngram-extraction folder a dataset as a newline delimited JSON file with keys "author" and "content" representing the distinct author name/id, and their content you want to extract DP n-grams from, respectively.
+- Now you can simply navigate to the notebook and run the code, changing `SOURCE_DATASET` to the name of the JSON file you just copied. If you are using something other than JSON, please change `FILE_EXTENSION` accordingly. You may also change the default values of the variables `DP_EPSILON` and `NGRAM_SIZE_LIMIT` based on your needs. Run the commands in the cells which should eventually provide you with the extracted DP n-grams in the `DPNGRAMS` dictionary - `DPNGRAMS["1gram"]` will be a pandas dataframe with the extracted DP 1-grams and so on.
 
 ## Contributing
 
