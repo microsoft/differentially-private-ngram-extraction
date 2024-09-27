@@ -13,7 +13,8 @@ The code repository structure is as follows:
   - tokenize_text.py: tokenizs text with nltk tokenizer
 - scripts: has scripts to run the code
   - convert_msnbc.py: converts MSNBC data
-  - convert_reddit.py: converts Reddit data 
+  - convert_reddit.py: converts Reddit data
+- DPNE Experiments.ipynb: Jupyter notebook to run on pyspark container for experimentation, which also runs the scripts in `run.cmd` (see below for instructions on how to run this)
 
 ## Prerequisites
 
@@ -24,31 +25,60 @@ The code requires following libraries installed:
 - PySpark == 2.3
 - shrike
 
-## How to run
+## Preparing container to run experiments
+Running this code on a container makes getting started fairly easy and reliably. Follow these steps to get this running on a local container:
+- Make sure you have [docker installed](https://docs.docker.com/engine/install/) and running
+- Run `docker pull jupyter/pyspark-notebook` to install the pyspark-jupyter container
+- Run the container mapping port 8888 locally so you can run the notebook on your machine, using `docker run -p 8888:8888 --name jupyter-pyspark jupyter/pyspark-notebook` - from the logs that open up, paste the command into your browser to run the notebook - something like `http://127.0.0.1:8888/lab?token=<TOKEN>`
+- Bash into the container by running `docker exec -it jupyter-pyspark bash`
+- Run `git clone https://github.com/microsoft/differentially-private-ngram-extraction.git` to pull this repo into the container
+- Install the required libraries as mentioned above:
+  ```
+  pip install nltk
+  pip install pyspark
+  pip install shrike==1.31.18
+  ```
+  Additionally, run a python shell and run the following commands:
+  ```
+  import nltk
+  nltk.download('punkt_tab')
+  ```
+Now at this point, you can replicate results from the paper or run DP N-grams extraction on your own dataset. See instructions for each case below:
 
-### Prepare data
-First, download the data from below:
+### Replicate results from the paper
+There are two data sources cited:
 - MSNBC: https://archive.ics.uci.edu/ml/datasets/msnbc.com+anonymous+web+data
 - Reddit: https://github.com/webis-de/webis-tldr-17-corpus, 
 downloadable from https://zenodo.org/record/1043504/files/corpus-webis-tldr-17.zip
-
-Then run the convert scripts from DPNE home directory,
+To prepare data from these in the right format, the following scripts from DPNE home directory are used. 
 ```
 python scripts/convert_msnbc.py --input_path [Input file path which has the downloaded file] --output_path [output directory, like /output]
 python scripts/convert_reddit.py --input_path [Input file path which has the downloaded file] --output_path [output directory, like /output]
 ```
+This is simplified within the attached notebook, where you can simply follow these steps to run this:
+ - With the container running, navigate to the [notebook](http://127.0.0.1:8888/lab/tree/differentially-private-ngram-extraction/DPNE%20Experiments.ipynb) and run the code starting from the first cell which downloads and prepares data (for the reddit case).
+ - You may also change the default values of the variables `DP_EPSILON` and `NGRAM_SIZE_LIMIT` based on your needs. Run the commands in the cells which should eventually provide you with the extracted DP n-grams in the `DPNGRAMS` dictionary - `DPNGRAMS["1gram"]` will be a pandas dataframe with the extracted DP 1-grams and so on.
+ - Follow the steps in the subsequent cells, which break up the tokenization, splitting of n-grams and then DP n-grams extraction into separate spark sessions, and cache the results locally.
+ - Once these scripts have successfully run, the 3rd cell allows reads them into a dictionary of pandas dataframes, from where you may access the extracted DP n-grams.
 
-### Run DPNE
 
-1. Archive the dpne directory to dpne.zip, this is needed for PySpark to use the package of the whole python scripts
-2. Use run.cmd, you will need to modify the first line of DATA_HOME where your converted data exists. Simply you can run it below from DPNE home directory,
+### Run on your own dataset
+- Copy over into the differentially-private-ngram-extraction folder a dataset as a newline delimited JSON file with keys "author" and "content" representing the distinct author name/id, and their content you want to extract DP n-grams from, respectively. On another terminal you can use the command `docker cp /path/to/file.json jupyter-pyspark:/home/jovyan/differentially-private-ngram-extraction/`
+- Now you can simply navigate to the [notebook](http://127.0.0.1:8888/lab/tree/differentially-private-ngram-extraction/DPNE%20Experiments.ipynb) and run the code, changing `SOURCE_DATASET` to the name of the JSON file you just copied. If you are using something other than JSON, please change `FILE_EXTENSION` accordingly. You may also change the default values of the variables `DP_EPSILON` and `NGRAM_SIZE_LIMIT` based on your needs. Run the commands in the cells which should eventually provide you with the extracted DP n-grams in the `DPNGRAMS` dictionary - `DPNGRAMS["1gram"]` will be a pandas dataframe with the extracted DP 1-grams and so on.
+- Follow the steps in the subsequent cells, which break up the tokenization, splitting of n-grams and then DP n-grams extraction into separate spark sessions, and cache the results locally.
+- Once these scripts have successfully run, the 3rd cell allows reads them into a dictionary of pandas dataframes, from where you may access the extracted DP n-grams.
+
+### Run DPNE without the container
+If you choose to run this within the shell or with local modifications without using the container method described above, simply follow these steps
+1. If you made changes to any file in the dpne/ folder, re-archive the dpne directory to dpne.zip, this is needed for PySpark to use the package of the whole python scripts.
+2. Assuming you are on a windows machine, use run.cmd, you will need to modify the first line of DATA_HOME where your converted data exists. Simply you can run it below from DPNE home directory,
 ```
 .\scripts\run.cmd
 ```
+If you are on a Linux based environment, see the corresponding shell scrips in the notebook.
 
 ## References
 [1] Kunho Kim, Sivakanth Gopi, Janardhan Kulkarni, Sergey Yekhanin. Differentially Private n-gram Extraction. In Proceedings of the Thirty-fifth Conference on Neural Information Processing Systems (NeurIPS), 2021.
-
 
 ## Contributing
 

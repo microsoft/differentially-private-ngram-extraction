@@ -7,7 +7,9 @@ to the json format we use for the DPNE code
 import argparse
 import json
 import os
-
+import logging
+from dpne.dpne_utils import log
+from shrike.compliant_logging import DataCategory, enable_compliant_logging
 
 def convert_reddit(file_reader, file_writer, field):
     for line in file_reader:
@@ -62,6 +64,7 @@ def get_arg_parser(parser=None):
     return parser
 
 if __name__ == '__main__':
+    enable_compliant_logging()
     parser = get_arg_parser()
     args = parser.parse_args()
 
@@ -71,4 +74,6 @@ if __name__ == '__main__':
     output_path = os.path.join(args.output_path, "reddit.json")
 
     with open(input_path, 'r', encoding='utf-8') as file_reader, open(output_path, 'w', encoding='utf-8') as file_writer:
+        log(logging.INFO,DataCategory.PUBLIC, "Initiating conversion of file..")
         convert_reddit(file_reader, file_writer, args.field)
+        log(logging.INFO,DataCategory.PUBLIC, "Conversion complete.")
