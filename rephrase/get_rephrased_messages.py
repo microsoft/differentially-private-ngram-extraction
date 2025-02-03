@@ -9,7 +9,7 @@ import argparse
 import logging
 
 # Check if we're in the local development or AML environment
-if os.path.exists(os.path.join(os.path.dirname(__file__),'rephrase','utils')):
+if os.path.exists(os.path.join(os.path.dirname(__file__),'utils')):
     print("In local development mode, adding common modules to path")
     # In development, add the project root to sys.path
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -125,14 +125,14 @@ def getScenarioInstructionsOrDefault(scenarioInstructions):
 
 def processScenario(df, column, idColumn, max_workers, endpoint, model_name, log):
     # Load the appropriate instructions and examples based on the rephrase type
-    
-    scenarioInstructions = read_yaml("./utils/prompts/rephrase_prompt/scenarios.yaml")
+
+    scenarioInstructions = read_yaml(os.path.join(os.path.dirname(__file__),"./utils/prompts/rephrase_prompt/scenarios.yaml"))
     getMessageFn = getMessage               
     
     baseInstructions, examples = getScenarioInstructionsOrDefault(scenarioInstructions)
     instructions = baseInstructions
 
-    llmapi = LLMApiAAD(endpoint,"2023-07-01-preview", model_name, max_tokens=100, n=1, temperature=0.0, top_p=1.0, logprobs=0, batch_size=1, max_retries=3)
+    llmapi = LLMApiAAD(endpoint,"2023-07-01-preview", model_name, max_tokens=100, n=1, temperature=0.0, top_p=1.0, batch_size=1, max_retries=3)
 
     message_fns = [lambda id=id, column=column: (id, getMessageFn(column, instructions, examples, llmapi.topResponses())) for id, column in zip(df[idColumn], df[column])]
 
@@ -163,6 +163,11 @@ def execute(dataset_path, column, idColumn, max_workers, output_path,endpoint,mo
 
     # Refill missing values for rephrased columns.
     df_repopulated[column] = df_repopulated.groupby(by=[column+'_original'])[column].transform(lambda x: x.ffill().bfill())
+
+    # Change column name from whatever was passed to 'content' for dpne scripts
+    df_repopulated.rename(columns={column: 'content'}, inplace=True)
+    # Rename 'user_identifier' column to 'author' for dpne scripts
+    df_repopulated.rename(columns={'user_identifier': 'author'}, inplace=True)
     log.info(f"df_repopulated.shape: {str(df_repopulated.shape)}")
     log.info(f"df_repopulated.cols: {','.join(df_repopulated.columns.to_list())}")
 

@@ -71,6 +71,8 @@ def convert_wildchat(output_path):
 
     # Generate UUIDs for each row to create a unique message identifier
     processed_df['message_id'] = [uuid.uuid4() for _ in range(len(processed_df))]
+    # Convert the 'message_id' column to string before saving to Parquet
+    processed_df['message_id'] = processed_df['message_id'].astype(str)
     # Print the first few rows of the processed dataframe to verify the data
     print(processed_df.head())
     

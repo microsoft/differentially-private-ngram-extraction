@@ -1,6 +1,8 @@
 from pathlib import Path
 import json
 import requests
+from typing import Union
+
 from ratelimit import limits
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -64,7 +66,6 @@ class LLMApiAAD:
     n: int = 1
     temperature: float = 0
     top_p: float = 1
-    logprobs: int = None
     batch_size: int = 10
     max_retries: int = 3
     prompt: str
@@ -77,11 +78,10 @@ class LLMApiAAD:
     TIME_PERIOD: int = 60   # time period in seconds
     CALLS: int = 50          # number of calls per time period
     
-    # default appId = heron app in smartcompose workspace
     def __init__(self, endpoint: str,api_version: str, model: str, max_tokens: int = 50, 
-                 n: int = 1, temperature: float = 0, top_p: float = 1, logprobs: bool =False, 
+                 n: int = 1, temperature: float = 0, top_p: float = 1, 
                  batch_size: int = 10, max_retries: int = 3,
-                 rate_calls: int = 50, rate_period: int = 60, stop_signal: str|None = None):
+                 rate_calls: int = 50, rate_period: int = 60, stop_signal: Union[str, None] = None):
         self.endpoint = endpoint
         self.api_version = api_version
         self.model = model
@@ -89,7 +89,6 @@ class LLMApiAAD:
         self.n = n
         self.temperature = temperature
         self.top_p = top_p
-        self.logprobs = logprobs
         self.batch_size = batch_size
         self.max_retries = max_retries
 
@@ -105,9 +104,10 @@ class LLMApiAAD:
 
         self.log = logging.getLogger(__name__)
 
-
-    def call_api(self,messages):
-        client = get_azure_openai_client(self.api_version, self.endpoint)
+    def get_client(self):
+        return get_azure_openai_client(self.api_version, self.endpoint)
+    
+    def call_api(self,client, messages):
         response = client.chat.completions.create(
             model=self.model,
             messages= messages,
@@ -115,7 +115,6 @@ class LLMApiAAD:
             max_tokens=self.max_tokens,
             n = self.n,
             top_p = self.top_p,
-            logprobs = self.logprobs,
             stop=self.STOP_SIGNAL
         )
         return response
@@ -125,10 +124,10 @@ class LLMApiAAD:
         responses = self.response_cache.topResponses(top_x)
         return responses
     
-    def make_post_request_fn(self, fn, max_retries=3):
-        return self.make_post_request(fn(), max_retries)
+    def make_post_request_fn(self, client, fn, max_retries=3):
+        return self.make_post_request(client, fn(), max_retries)
 
-    def make_post_request(self, data, max_retries=3):
+    def make_post_request(self,client, data, max_retries=3):
         global pause_duration
 
         id, messages = data
@@ -141,58 +140,13 @@ class LLMApiAAD:
                 time.sleep(pause_duration)
                 pause_event.clear()
             try:
-                response = self.call_api(messages=messages)
-                
-                # If any error, wait a bit, and retry.
-                if response.status_code in [400, 408, 500, 503] :
-                    self.log.warning("Error. Retrying in 120 seconds.")
-                    attempts += 1
-
-                    time.sleep(120)
-
-                    continue
-
-                # We need to slow down. Stop everyone.
-                if response.status_code == 429:
-                    # If a 429 response is received, set the pause_event and update pause_duration
-                    retry_after = 30
-
-                    with lock:
-                        pause_duration = retry_after
-                    pause_event.set()
-                    time.sleep(1)
-                    attempts += 1
-                    continue  # Retry after pause
-
-                if response.status_code == 200:
-                   
-                    content = response.choices[0].message.content
-                    
-                    self.response_cache.add_response(content=content)
-
-                    # Give thread a brief break before next one. Space out threads.
-                    waiting = random.randint(1,7)
-                    time.sleep(waiting)
-                    return id, response.status_code, content
-                
-                # Should not get here if we've covered main sources of errors.
-                self.log.warning(f"Unknown error response: {response.status_code}")
-                time.sleep(10)
-                attempts += 1
-            
-            except (requests.ConnectTimeout, ConnectionResetError, ConnectionError, TimeoutError) as e:
+                response = self.call_api(client=client, messages=messages)
+                return id, response, response.choices[0].message.content
+            except Exception as e:
                 self.log.warning(f"{type(e).__name__}\: {str(e)}")
-                time.sleep(60)
+                time.sleep(15)
                 attempts += 1
                 continue
-
-            except requests.RequestException as e:
-                self.log.warning(f"Error: {e}")
-                return id, None, ""
-            
-            except Exception as e:
-                self.log.warning(f"Unexpected error: {e}")
-                return id, None, ""
 
         self.log.warning(f"Failed after {max_retries} attempts")
         return id, None, ""
@@ -209,9 +163,10 @@ class LLMApiAAD:
     # Submit lambda functions to execute
     def parallel_post_requests_fn(self, messageListFn, max_workers=2, max_retries=3):
         results = []
+        client = self.get_client()
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             # Submitting all the POST requests
-            submissions = {executor.submit(self.make_post_request_fn, messagesFn, max_retries): messagesFn for messagesFn in messageListFn}
+            submissions = {executor.submit(self.make_post_request_fn,client, messagesFn, max_retries): messagesFn for messagesFn in messageListFn}
             results = self._waitResults(submissions)
             self.log.info(f"Received all results.")
 
