@@ -77,6 +77,21 @@ If you choose to run this within the shell or with local modifications without u
 ```
 If you are on a Linux based environment, see the corresponding shell scrips in the notebook.
 
+## DPNE + Rephrase experiment with Wildchat Dataset
+a. To run the DPNE+Rephrase experiment first install a python version 3.8+ and then install the below libraries as requirements:
+
+```
+1. azure-identity==1.16.0
+2. dask==2023.5.0
+3. datasets==2.19.2
+4. huggingface-hub==0.28.1
+5. openai==1.33.0
+6. sentence-transformers==3.0.0
+7. pandas==2.0.3
+8. numpy==1.23.5
+```
+
+b. Use the .\scripts\run_wildchat_rephrase_exp.cmd script to run the experiment.
 ## References
 [1] Kunho Kim, Sivakanth Gopi, Janardhan Kulkarni, Sergey Yekhanin. Differentially Private n-gram Extraction. In Proceedings of the Thirty-fifth Conference on Neural Information Processing Systems (NeurIPS), 2021.
 
